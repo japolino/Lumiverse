@@ -19,8 +19,8 @@ Connection failures show a dialog with Retry and Change server, rather than
 leaving an unexplained blank screen. A loading spinner appears during navigation.
 
 Paging targets the visible `data-chat-scroll` container already present in
-Lumiverse. It does nothing while an input is focused, a dialog is open, or no
-chat is visible. While volume paging is enabled on a loaded server, volume
+Lumiverse. It does nothing while a visible dialog is open or no chat is visible.
+Composer focus does not block hardware paging, even after the keyboard closes. While volume paging is enabled on a loaded server, volume
 buttons are consumed even when paging does nothing. Disable volume paging in connection settings to adjust
 audio, including during TTS playback. Background volume controls are unaffected.
 
@@ -63,7 +63,8 @@ Before merging, test on a physical Android phone:
 - Connect, sign in, restart the app, and verify session persistence.
 - Page a long chat in both directions, including while a response is streaming.
 - Confirm 15% overlap, no repeated paging when held, and loading older history.
-- Open the keyboard or a modal and verify the chat behind it does not move.
+- Keep the composer focused after closing the keyboard and verify paging works.
+- Open a modal and verify the chat behind it does not move.
 - Turn volume paging off and test media volume; test it with the app backgrounded.
 - Rotate the device and check system bars, keyboard insets and the controls.
 - Verify external links open in the browser and invalid TLS is rejected.
