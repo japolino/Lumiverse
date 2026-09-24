@@ -16,6 +16,9 @@ public final class MainActivity extends Activity {
     private String pageScript;
     private boolean volumePaging;
     private boolean loaded;
+    private boolean loadFailed;
+    private AlertDialog connectionError;
+    private ProgressBar loading;
     private final VolumePagingKeys pagingKeys = new VolumePagingKeys();
 
     // Lumiverse requires JavaScript; native bridges and file access stay disabled.
@@ -31,7 +34,7 @@ public final class MainActivity extends Activity {
         } catch (Exception error) { throw new IllegalStateException(error); }
         var prefs = getPreferences(MODE_PRIVATE);
         origin = prefs.getString("origin", "");
-        volumePaging = prefs.getBoolean("volumePaging", false);
+        volumePaging = prefs.getBoolean("readingVolumePaging", true);
         var layout = new LinearLayout(this);
         layout.setOrientation(LinearLayout.VERTICAL);
         layout.setOnApplyWindowInsetsListener((view, insets) -> {
@@ -39,20 +42,8 @@ public final class MainActivity extends Activity {
                 insets.getSystemWindowInsetRight(), insets.getSystemWindowInsetBottom());
             return insets;
         });
-        var bar = new LinearLayout(this);
-        addButton(bar, "Server", this::configure);
-        addButton(bar, "Up", () -> page(-1));
-        addButton(bar, "Down", () -> page(1));
-        var toggle = new Switch(this);
-        toggle.setText(R.string.volume_paging);
-        toggle.setChecked(volumePaging);
-        toggle.setOnCheckedChangeListener((button, checked) -> {
-            volumePaging = checked;
-            prefs.edit().putBoolean("volumePaging", checked).apply();
-        });
-        layout.addView(bar);
-        layout.addView(toggle);
         web = new WebView(this);
+        web.setBackgroundColor(android.graphics.Color.rgb(18, 18, 22));
         web.getSettings().setJavaScriptEnabled(true);
         web.getSettings().setDomStorageEnabled(true);
         web.getSettings().setAllowFileAccess(false);
@@ -71,26 +62,50 @@ public final class MainActivity extends Activity {
                 }
                 return true;
             }
-            @Override public void onPageStarted(WebView view, String url, android.graphics.Bitmap icon) { loaded = false; }
-            @Override public void onPageFinished(WebView view, String url) { loaded = sameOrigin(Uri.parse(url)); }
+            @Override public void onPageStarted(WebView view, String url, android.graphics.Bitmap icon) {
+                loaded = false;
+                loadFailed = false;
+                loading.setVisibility(android.view.View.VISIBLE);
+            }
+            @Override public void onPageFinished(WebView view, String url) {
+                loading.setVisibility(android.view.View.GONE);
+                loaded = !loadFailed && sameOrigin(Uri.parse(url));
+            }
+            @Override public void onReceivedSslError(WebView view, SslErrorHandler handler, android.net.http.SslError error) {
+                handler.cancel();
+                showConnectionError("The server's HTTPS certificate could not be verified. If your private server uses HTTP, enter http:// before its address.");
+            }
+            @Override public void onReceivedHttpError(WebView view, WebResourceRequest request, WebResourceResponse response) {
+                if (request.isForMainFrame()) showConnectionError("The server returned HTTP " + response.getStatusCode() + ".");
+            }
             @Override public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
                 if (request.isForMainFrame()) {
-                    loaded = false;
-                    Toast.makeText(MainActivity.this, "Could not load server. Check the address and connection.", Toast.LENGTH_LONG).show();
+                    showConnectionError("Could not open " + origin + ". Check that the server is running and your VPN is connected.\n\n" + error.getDescription());
                 }
             }
         });
-        layout.addView(web, new LinearLayout.LayoutParams(-1, 0, 1));
+        var content = new FrameLayout(this);
+        content.addView(web, new FrameLayout.LayoutParams(-1, -1));
+        loading = new ProgressBar(this);
+        var spinnerLayout = new FrameLayout.LayoutParams(-2, -2, android.view.Gravity.CENTER);
+        content.addView(loading, spinnerLayout);
+        loading.setVisibility(android.view.View.GONE);
+        layout.addView(content, new LinearLayout.LayoutParams(-1, -1));
         setContentView(layout);
         layout.requestApplyInsets();
         if (!origin.isEmpty()) web.loadUrl(origin); else configure();
     }
 
-    private void addButton(LinearLayout bar, String label, Runnable action) {
-        var button = new Button(this);
-        button.setText(label);
-        button.setOnClickListener(view -> action.run());
-        bar.addView(button, new LinearLayout.LayoutParams(0, -2, 1));
+    private void showConnectionError(String message) {
+        loaded = false;
+        loadFailed = true;
+        loading.setVisibility(android.view.View.GONE);
+        if (isFinishing() || (connectionError != null && connectionError.isShowing())) return;
+        connectionError = new AlertDialog.Builder(this).setTitle("Cannot connect to Lumiverse")
+            .setMessage(message)
+            .setPositiveButton("Retry", (dialog, which) -> web.loadUrl(origin))
+            .setNeutralButton("Change server", (dialog, which) -> configure())
+            .setNegativeButton("Close", (dialog, which) -> finish()).show();
     }
 
     private boolean sameOrigin(Uri url) {
@@ -103,9 +118,18 @@ public final class MainActivity extends Activity {
         input.setInputType(android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_VARIATION_URI);
         input.setHint("https://your-lumiverse-server");
         input.setText(origin);
+        var settings = new LinearLayout(this);
+        settings.setOrientation(LinearLayout.VERTICAL);
+        int padding = (int) (24 * getResources().getDisplayMetrics().density);
+        settings.setPadding(padding, 0, padding, 0);
+        settings.addView(input);
+        var toggle = new Switch(this);
+        toggle.setText(R.string.volume_paging);
+        toggle.setChecked(volumePaging);
+        settings.addView(toggle);
         var dialog = new AlertDialog.Builder(this).setTitle("Lumiverse server")
-            .setMessage("Enter your server address, for example 100.93.69.95:7860. Private IP addresses use HTTP by default; other addresses use HTTPS. HTTP has no TLS encryption, so use it only over a trusted connection such as your VPN.")
-            .setView(input).setNegativeButton("Cancel", null).setPositiveButton("Connect", null).create();
+            .setMessage("Enter your server address, for example 192.168.1.10:7860. Private IP addresses use HTTP by default; other addresses use HTTPS. HTTP has no TLS encryption, so use it only over a trusted connection such as your VPN.")
+            .setView(settings).setNegativeButton("Cancel", (ignored, which) -> { if (origin.isEmpty()) finish(); }).setPositiveButton("Connect", null).create();
         dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(view -> {
             try {
                 origin = ServerAddress.normalize(input.getText().toString());
@@ -113,7 +137,9 @@ public final class MainActivity extends Activity {
                 input.setError("Enter a server address with an optional http:// or https:// prefix, without a path, credentials, query or fragment.");
                 return;
             }
-            getPreferences(MODE_PRIVATE).edit().putString("origin", origin).apply();
+            volumePaging = toggle.isChecked();
+            getPreferences(MODE_PRIVATE).edit().putString("origin", origin)
+                .putBoolean("readingVolumePaging", volumePaging).apply();
             loaded = false;
             web.loadUrl(origin);
             dialog.dismiss();
@@ -136,7 +162,11 @@ public final class MainActivity extends Activity {
     }
 
     @Override public void onBackPressed() {
-        if (web.canGoBack()) web.goBack(); else super.onBackPressed();
+        if (web.canGoBack()) web.goBack();
+        else new AlertDialog.Builder(this).setTitle("Lumiverse")
+            .setItems(new String[]{"Connection settings", "Close app"}, (dialog, which) -> {
+                if (which == 0) configure(); else finish();
+            }).setNegativeButton("Cancel", null).show();
     }
     @Override protected void onPause() { pagingKeys.reset(); web.onPause(); CookieManager.getInstance().flush(); super.onPause(); }
     @Override protected void onResume() { super.onResume(); if (web != null) web.onResume(); }

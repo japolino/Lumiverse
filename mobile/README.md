@@ -7,16 +7,21 @@ mobile client, not a port of the desktop tray or its local server runner.
 ## Use
 
 1. Install the debug APK from the **Build Android companion** workflow artifact.
-2. Tap **Server**, enter your Lumiverse server address, and sign in using the web UI.
-3. Turn on **Volume paging**. Volume Up pages up, Volume Down pages down.
+2. Enter your Lumiverse server address once, then sign in using the web UI.
+3. Lumiverse fills the app with no native toolbar or on-screen paging buttons.
+   Volume Up pages up and Volume Down pages down, enabled by default.
    Each press moves 85% of the visible chat height. Holding a button does not repeat.
-4. Turn the switch off to use normal volume controls. The preference is saved.
-   On-screen **Up** and **Down** buttons also page the chat.
+4. Android Back navigates browser history. At the root it offers connection
+   settings and Close app. Connection settings can change the server or disable
+   volume paging to restore normal volume controls. Preferences are saved.
+
+Connection failures show a dialog with Retry and Change server, rather than
+leaving an unexplained blank screen. A loading spinner appears during navigation.
 
 Paging targets the visible `data-chat-scroll` container already present in
 Lumiverse. It does nothing while an input is focused, a dialog is open, or no
 chat is visible. While volume paging is enabled on a loaded server, volume
-buttons are consumed even when paging does nothing. Disable the switch to adjust
+buttons are consumed even when paging does nothing. Disable volume paging in connection settings to adjust
 audio, including during TTS playback. Background volume controls are unaffected.
 
 The companion uses the chat's existing wheel handler to stop automatic following
@@ -59,7 +64,7 @@ Before merging, test on a physical Android phone:
 - Page a long chat in both directions, including while a response is streaming.
 - Confirm 15% overlap, no repeated paging when held, and loading older history.
 - Open the keyboard or a modal and verify the chat behind it does not move.
-- Switch volume paging off and test media volume; test it with the app backgrounded.
+- Turn volume paging off and test media volume; test it with the app backgrounded.
 - Rotate the device and check system bars, keyboard insets and the controls.
 - Verify external links open in the browser and invalid TLS is rejected.
 
