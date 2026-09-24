@@ -94,10 +94,7 @@ public final class MainActivity extends Activity {
     }
 
     private boolean sameOrigin(Uri url) {
-        Uri selected = Uri.parse(origin);
-        return "https".equals(url.getScheme()) && selected.getHost() != null
-            && selected.getHost().equalsIgnoreCase(url.getHost())
-            && (selected.getPort() == -1 ? 443 : selected.getPort()) == (url.getPort() == -1 ? 443 : url.getPort());
+        return ServerAddress.sameOrigin(origin, url.toString());
     }
 
     private void configure() {
@@ -107,16 +104,15 @@ public final class MainActivity extends Activity {
         input.setHint("https://your-lumiverse-server");
         input.setText(origin);
         var dialog = new AlertDialog.Builder(this).setTitle("Lumiverse server")
-            .setMessage("Enter your server's HTTPS origin. Sign in inside the app. Volume paging is optional and replaces volume controls while this app is open.")
+            .setMessage("Enter your server address, for example 100.93.69.95:7860. Private IP addresses use HTTP by default; other addresses use HTTPS. HTTP has no TLS encryption, so use it only over a trusted connection such as your VPN.")
             .setView(input).setNegativeButton("Cancel", null).setPositiveButton("Connect", null).create();
         dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(view -> {
-            Uri url = Uri.parse(input.getText().toString().trim());
-            if (!"https".equals(url.getScheme()) || url.getHost() == null || url.getUserInfo() != null
-                || (url.getPath() != null && !url.getPath().isEmpty() && !url.getPath().equals("/"))
-                || url.getQuery() != null || url.getFragment() != null) {
-                input.setError("Enter an HTTPS origin without a path, credentials, query or fragment."); return;
+            try {
+                origin = ServerAddress.normalize(input.getText().toString());
+            } catch (IllegalArgumentException error) {
+                input.setError("Enter a server address with an optional http:// or https:// prefix, without a path, credentials, query or fragment.");
+                return;
             }
-            origin = url.buildUpon().path("").build().toString();
             getPreferences(MODE_PRIVATE).edit().putString("origin", origin).apply();
             loaded = false;
             web.loadUrl(origin);

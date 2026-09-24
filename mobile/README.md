@@ -7,7 +7,7 @@ mobile client, not a port of the desktop tray or its local server runner.
 ## Use
 
 1. Install the debug APK from the **Build Android companion** workflow artifact.
-2. Tap **Server**, enter your Lumiverse HTTPS origin, and sign in using the web UI.
+2. Tap **Server**, enter your Lumiverse server address, and sign in using the web UI.
 3. Turn on **Volume paging**. Volume Up pages up, Volume Down pages down.
    Each press moves 85% of the visible chat height. Holding a button does not repeat.
 4. Turn the switch off to use normal volume controls. The preference is saved.
@@ -21,7 +21,10 @@ audio, including during TTS playback. Background volume controls are unaffected.
 
 The companion uses the chat's existing wheel handler to stop automatic following
 before scrolling. Paging needs no server update. TLS errors are never bypassed;
-use a valid HTTPS certificate trusted by Android. HTTP servers are not supported.
+HTTPS requires a valid certificate trusted by Android. Private IPv4 addresses, including
+100.64.0.0/10 VPN addresses, default to HTTP when no scheme is entered. Other
+addresses default to HTTPS. An explicit http:// or https:// always takes precedence.
+HTTP has no TLS encryption; use it over a trusted connection such as your VPN.
 Web content has no JavaScript-to-native bridge and no file access. Links outside
 the selected origin open in the system browser when explicitly tapped.
 
