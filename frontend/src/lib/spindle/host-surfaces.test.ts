@@ -22,6 +22,10 @@ const testStore = {
   extensionCommands: [],
   inputBarActions: [],
   pendingWorldBookEditEntryId: null as string | null,
+  settingsCalls: [] as unknown[][],
+  openSettings(...args: unknown[]) {
+    testStore.settingsCalls.push(args)
+  },
   activeModal: null as string | null,
   modalProps: {} as Record<string, unknown>,
   setPendingWorldBookEditEntryId(id: string | null) {
@@ -38,8 +42,9 @@ mock.module('@/lib/drawer-tab-registry', () => ({
   DRAWER_TABS: [],
   extensionTabsToCommands: () => [],
 }))
+let visibleSettingsTabs: unknown[] = []
 mock.module('@/lib/settings-tab-registry', () => ({
-  getVisibleSettingsTabs: () => [],
+  getVisibleSettingsTabs: () => visibleSettingsTabs,
   settingsRegistryToCommands: () => [],
 }))
 mock.module('@/router', () => ({ router: { navigate: () => {} } }))
@@ -184,6 +189,28 @@ describe('H4 host surface catalog and invocation', () => {
     })
     await crossApi.invoke({ kind: 'input_bar_action', id: 'b-action' })
     expect(calls).toEqual(['a-action', 'b-action'])
+  })
+
+  test('the live catalog lists the core settings tabs, not extension tab bodies', () => {
+    visibleSettingsTabs = [settings('account'), settings('voice')]
+    Object.assign(testStore, { settingsTabs: [{ tabId: 'voice', extensionId: 'ext-b' }] })
+    try {
+      const api = createHostSurfaceAPI({ extensionId: 'ext-a' })
+      expect(api.list(['settings_tab']).map((surface) => surface.id)).toEqual(['account', 'voice'])
+    } finally {
+      visibleSettingsTabs = []
+    }
+  })
+
+  test('default settings action forwards the section anchor', () => {
+    testStore.settingsCalls = []
+    const api = createHostSurfaceAPI({
+      extensionId: 'ext-a',
+      getInputs: () => ({ userRole: 'user', settingsTabs: [settings('voice')], inputBarActions: [], extensionCommands: [] }),
+    })
+    api.invoke({ kind: 'settings_tab', id: 'voice' }, { anchorId: 'setsec-voice-tts' })
+    api.invoke({ kind: 'settings_tab', id: 'voice' })
+    expect(testStore.settingsCalls).toEqual([['voice', { anchorId: 'setsec-voice-tts' }], ['voice', undefined]])
   })
 
   test('role-filtered settings remain absent for invocation and snapshot', () => {
